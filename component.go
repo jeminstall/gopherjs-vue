@@ -73,3 +73,34 @@ func NewComponent(
 	})
 	return opt.NewComponent()
 }
+
+// NewComponentWithProps creates and registers a named global Component
+// vmCreator should return a gopherjs struct pointer. see New for more details
+func NewComponentWithProps(
+	vmCreator func() (structPtr interface{}),
+	templateStr string,
+	props ...string,
+) *Component {
+	// args
+	idx := len(creatorPool)
+	creatorPool = append(creatorPool, new(pool))
+	creatorPool[idx].creator = vmCreator
+	vmfn := func() interface{} {
+		p := creatorPool[idx]
+		if p.counter%3 == 0 {
+			p.structPtr = p.creator()
+		}
+		p.counter += 1
+		return p.structPtr
+	}
+	// opts
+	opt := NewOption()
+	opt.Data = vmfn
+	opt.Template = templateStr
+	opt.AddProp(props...)
+	opt.OnLifeCycleEvent(EvtBeforeCreate, func(vm *ViewModel) {
+		vm.Options.Set("methods", js.MakeWrapper(vmfn()))
+		vMap[vmfn()] = vm
+	})
+	return opt.NewComponent()
+}
